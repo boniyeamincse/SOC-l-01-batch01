@@ -660,8 +660,27 @@ normalization, detection engineering, and SIEM administration."
 -   [ ] Practice log analysis examples.
 -   [ ] Understand Agent vs. Agentless.
 -   [ ] Understand FIM.
--   [ ] Answer the 10 interview questions.
+-   [ ] Answer the 15 interview questions.
 -   [ ] Practice English speaking.
+
+------------------------------------------------------------------------
+
+## 18. Additional Interview Questions -- Class 01
+
+### Basic Questions
+
+1.  What is the difference between a SOC and a NOC?
+2.  Name the three core components of a SOC and briefly explain each one.
+
+### Scenario-Based Questions
+
+3.  A SIEM alert shows 50 failed SSH logins from a single IP address
+    within 2 minutes. As an L1 analyst, what are your first steps?
+4.  An employee reports that a file in `/etc/` was modified without
+    approval. How would you use File Integrity Monitoring to investigate?
+5.  A critical server stops sending logs to the SIEM. How would you
+    troubleshoot whether the issue is the agent, the network, or the SIEM
+    itself?
 
 ------------------------------------------------------------------------
 
