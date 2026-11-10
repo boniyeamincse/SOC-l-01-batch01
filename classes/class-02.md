@@ -179,27 +179,37 @@ This section shows how a practical SOC is structured from data collection to res
 
 ### 4.2 End-to-End SOC Data Flow
 
-```text
-Log Sources (Endpoint/Network/Cloud/App)
-                |
-                v
-      Collectors / Agents / APIs
-                |
-                v
-   SIEM Ingestion + Parsing + Normalization
-                |
-                v
- Correlation Rules + Detection Analytics
-                |
-                v
-           Alerts / Cases
-                |
-                v
-     L1 Triage -> L2 Investigation -> L3 Response
-                |
-                v
-         Containment / Recovery / Lessons Learned
+```mermaid
+flowchart TD
+    SRC["Log Sources<br/>Endpoint / Network / Identity / Cloud / App"]
+    COL["Collectors / Agents / APIs"]
+    ING["SIEM Ingestion<br/>Parsing + Normalization + Enrichment"]
+    STO[("Indexed Storage<br/>hot / warm / cold")]
+    DET["Correlation Rules + Detection Analytics"]
+    ALR["Alerts / Cases"]
+    L1{"L1 Triage"}
+    CLOSE["Close<br/>(benign / False Positive)"]
+    L2{"L2 Investigation"}
+    L3["L3 Advanced Analysis<br/>and Incident Response"]
+    RESP["Containment / Recovery"]
+    LL["Lessons Learned<br/>(tune rules, update playbooks)"]
+
+    SRC --> COL --> ING
+    ING --> STO
+    ING --> DET --> ALR --> L1
+    L1 -->|"benign"| CLOSE
+    L1 -->|"suspicious"| L2
+    L2 -->|"benign"| CLOSE
+    L2 -->|"confirmed, within L2 scope"| RESP
+    L2 -->|"complex / high impact"| L3
+    L3 --> RESP
+    RESP --> LL
+    LL -.->|"feedback"| DET
 ```
+
+Escalation is conditional: most alerts are closed or handled at L1 or L2,
+and only complex or high-impact incidents reach L3. Lessons learned feed
+back into detection so the same problem is caught faster next time.
 
 ### 4.3 Why Architecture Matters
 
@@ -223,28 +233,38 @@ A typical Wazuh deployment includes:
 
 ### Simplified Wazuh architecture
 
-```text
-Windows / Linux / macOS Endpoints
-              |
-         Wazuh Agent
-              |
-       Secure Communication
-              |
-        Wazuh Manager
-       (Decoders + Rules)
-              |
-         Alerts / Events
-              |
-        Wazuh Indexer
-          (OpenSearch)
-              |
-        Wazuh Dashboard
-       (Search & Analysis)
+```mermaid
+flowchart TD
+    EP["Windows / Linux / macOS Endpoints"]
+    AG["Wazuh Agent<br/>(installed on each endpoint)"]
+    subgraph SRV["Wazuh Server"]
+        MGR["Wazuh Manager<br/>Decoders → Rules → Alerts"]
+        FB["Filebeat"]
+    end
+    IDX["Wazuh Indexer<br/>(based on OpenSearch)"]
+    DASH["Wazuh Dashboard<br/>(search and analysis)"]
+
+    EP -->|"collects local logs"| AG
+    AG -->|"encrypted forwarding<br/>1514/TCP"| MGR
+    MGR -->|"alerts"| FB
+    FB -->|"9200/TCP"| IDX
+    IDX <-->|"search queries"| DASH
+    MGR <-.->|"Wazuh API 55000/TCP<br/>(agent and rule management)"| DASH
 ```
+
+| Port | Used for |
+|---|---|
+| 1514/TCP | Agent sends events to the manager (encrypted) |
+| 1515/TCP | Agent enrollment (registration with the manager) |
+| 9200/TCP | Filebeat sends alerts to the indexer; dashboard queries the indexer |
+| 55000/TCP | Wazuh server API used by the dashboard |
+| 443/TCP | Analysts open the dashboard in a browser |
 
 ### Important distinctions
 
 - Wazuh Manager performs analysis using decoders and rules.
+- Filebeat runs on the Wazuh server and ships alerts from the manager to the indexer.
+- The dashboard does not receive logs; it searches the indexer and talks to the manager through the Wazuh API.
 - Wazuh Indexer is the storage and indexing layer.
 - Wazuh Dashboard is the user interface.
 - OpenSearch is related to Elasticsearch historically, but they are separate projects.
@@ -367,29 +387,15 @@ Example JSON document:
 
 ### SIEM data flow
 
-```text
-Log Sources
-    |
-    v
-Log Collection
-    |
-    v
-Parsing and Decoding
-    |
-    v
-Normalization / Enrichment
-    |
-    v
-Detection Rules and Correlation
-    |
-    v
-Alert Generation
-    |
-    v
-Analyst Investigation
-    |
-    v
-Close / Escalate / Respond
+```mermaid
+flowchart TD
+    A["Log Sources"] --> B["Log Collection"]
+    B --> C["Parsing and Decoding"]
+    C --> D["Normalization / Enrichment"]
+    D --> E["Detection Rules and Correlation"]
+    E --> F["Alert Generation"]
+    F --> G["Analyst Investigation"]
+    G --> H["Close / Escalate / Respond"]
 ```
 
 ---
@@ -398,30 +404,33 @@ Close / Escalate / Respond
 
 Consider a Windows endpoint generating security events.
 
-```text
-Windows Endpoint
-       |
-       v
-Wazuh Agent
-       |
-       v
-Wazuh Manager
-       |
-       v
-Decoder: Understands the log format
-       |
-       v
-Rule: Evaluates the event or event pattern
-       |
-       v
-Alert: Generated when a rule matches
-       |
-       v
-SOC Analyst: Investigates the alert
-       |
-       v
-Close / Escalate / Response
+```mermaid
+flowchart TD
+    EP["Windows Endpoint<br/>(e.g. Event ID 4625: failed logon)"]
+    AG["Wazuh Agent"]
+    subgraph MGR["Wazuh Manager"]
+        RAW["Raw log received"]
+        DEC["Decoder<br/>understands the log format<br/>and extracts fields"]
+        RULE{"Rule<br/>do the conditions match?"}
+        ALERT["Alert generated<br/>(rule ID + severity level)"]
+        NOALERT["No alert<br/>(kept only if archiving is enabled)"]
+    end
+    IDX["Wazuh Indexer"]
+    DASH["Wazuh Dashboard"]
+    AN["SOC Analyst investigates the alert"]
+    OUT["Close / Escalate / Respond"]
+
+    EP --> AG
+    AG -->|"1514/TCP"| RAW
+    RAW --> DEC --> RULE
+    RULE -->|"yes"| ALERT
+    RULE -->|"no"| NOALERT
+    ALERT -->|"via Filebeat"| IDX
+    IDX --> DASH --> AN --> OUT
 ```
+
+The decoder and rules run **inside** the Wazuh Manager. Only alerts are
+sent on to the indexer, where analysts find them through the dashboard.
 
 ### Important concepts
 
@@ -461,23 +470,15 @@ A common SOC workflow is:
 
 ### Example workflow
 
-```text
-Agent / Log Source
-       |
-       v
-SIEM Detection Rule
-       |
-       v
-Alert Generated
-       |
-       v
-Analyst Investigation
-       |
-       +---- Benign activity ----> Close as False Positive
-       |
-       +---- Confirmed threat ---> Respond / Escalate
-       |
-       +---- Not enough evidence -> Gather more evidence
+```mermaid
+flowchart TD
+    SRC["Agent / Log Source"] --> RULE["SIEM Detection Rule"]
+    RULE --> ALERT["Alert Generated"]
+    ALERT --> INV{"Analyst Investigation"}
+    INV -->|"benign activity"| FP["Close as False Positive"]
+    INV -->|"confirmed threat"| TP["True Positive:<br/>Respond / Escalate"]
+    INV -->|"not enough evidence"| MORE["Gather more evidence"]
+    MORE -->|"re-assess"| INV
 ```
 
 ---

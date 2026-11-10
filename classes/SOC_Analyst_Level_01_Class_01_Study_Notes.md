@@ -287,33 +287,72 @@ server using Syslog.
 
 ### Agent-based architecture
 
-``` text
-Linux / Windows Endpoint
-          |
-     Wazuh Agent
-          |
-     Log Forwarding
-          |
-     Wazuh Manager
-          |
-   Wazuh Indexer
-          |
-   Wazuh Dashboard
+```mermaid
+flowchart TD
+    EP["Linux / Windows / macOS Endpoint<br/>(system logs, file changes, configuration)"]
+    AG["Wazuh Agent<br/>(installed on the endpoint)"]
+    subgraph SRV["Wazuh Server"]
+        MGR["Wazuh Manager<br/>Decoders → Rules → Alerts"]
+        FB["Filebeat"]
+    end
+    IDX["Wazuh Indexer<br/>(stores and indexes alerts)"]
+    DASH["Wazuh Dashboard<br/>(web interface for analysts)"]
+
+    EP -->|"collects local logs"| AG
+    AG -->|"encrypted log forwarding<br/>1514/TCP"| MGR
+    MGR -->|"alerts"| FB
+    FB -->|"9200/TCP"| IDX
+    IDX <-->|"search queries"| DASH
 ```
+
+How to read it:
+
+1.  The **Wazuh Agent** collects logs and security data on the endpoint.
+2.  The agent sends the data to the **Wazuh Manager** over an encrypted
+    connection (port 1514/TCP). Agents register with the manager first
+    using port 1515/TCP.
+3.  The **manager** decodes each log, checks it against rules and creates
+    an alert when a rule matches.
+4.  **Filebeat** (running on the Wazuh server) ships the alerts to the
+    **Wazuh Indexer** for storage.
+5.  The **Wazuh Dashboard** does not receive logs. It searches the
+    indexer and shows the results to the analyst.
 
 ### Agentless architecture
 
-``` text
-Firewall / Router / Switch
-          |
-     Syslog Forwarding
-          |
-   SIEM / Log Collector
-          |
-     Log Analysis
-          |
-       Dashboard
+```mermaid
+flowchart TD
+    NET["Firewall / Router / Switch<br/>(cannot run an agent)"]
+    RS["Rsyslog collector<br/>(optional relay)"]
+    subgraph SRV["Wazuh Server"]
+        MGR["Wazuh Manager<br/>syslog listener<br/>Decoders → Rules → Alerts"]
+        FB["Filebeat"]
+    end
+    IDX["Wazuh Indexer<br/>(stores and indexes alerts)"]
+    DASH["Wazuh Dashboard<br/>(web interface for analysts)"]
+
+    NET -->|"Syslog 514/UDP or TCP"| MGR
+    NET -.->|"Syslog"| RS
+    RS -.->|"forwards logs"| MGR
+    MGR -->|"alerts"| FB
+    FB -->|"9200/TCP"| IDX
+    IDX <-->|"search queries"| DASH
 ```
+
+How to read it:
+
+1.  The network device sends its logs with **Syslog**, either directly to
+    the Wazuh Manager or through an **Rsyslog** collector that relays them.
+2.  From the manager onward, the flow is the same as agent-based
+    collection: decoders, rules, alerts, indexer and dashboard.
+
+Other agentless methods from the table above:
+
+-   **SSH:** Wazuh's *agentless monitoring* feature lets the manager log
+    in to a device over SSH to check files and command output for changes.
+-   **SNMP:** Wazuh does not poll SNMP itself. SNMP is usually handled by
+    network monitoring tools (for example Zabbix or PRTG), which can
+    forward their events to the SIEM as Syslog.
 
 ------------------------------------------------------------------------
 
