@@ -6,8 +6,9 @@ SOC Analyst Level 01 — Batch 01 study notes and class resources.
 
 | Class | Notes | YouTube |
 | :---: | :---- | :------ |
-| 01 | [SOC Analyst Level 01 — Class 01](classes/SOC_Analyst_Level_01_Class_01_Study_Notes.md) | [Watch](https://www.youtube.com/watch?v=4IGzfBGBEWA) |
+| 01 | [SOC Analyst Level 01 — Class 01](classes/class-01.md) | [Watch](https://www.youtube.com/watch?v=4IGzfBGBEWA) |
 | 02 | [SOC Analyst Level 01 — Class 02](classes/class-02.md) | _Coming soon_ |
+| 03 | [SOC Analyst Level 01 — Class 03](classes/class-03.md) | _Coming soon_ |
 
 ## Contributing
 

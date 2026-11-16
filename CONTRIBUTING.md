@@ -20,7 +20,7 @@ This guide explains:
 - Class notes: classes/
 
 Example files:
-- classes/SOC_Analyst_Level_01_Class_01_Study_Notes.md
+- classes/class-01.md
 - classes/class-02.md
 
 ## 3) How to Add a New Class Note
